@@ -1,4 +1,5 @@
 ## ~~~ Section 1 - Getting ready to work ~~~ ##
+## Home git == https://github.com/acblimehouse/jndcode ##
   ## ID & Set Working Directory
     ## Create WD Object, set as appopriate
     workdir <- "/Users/adamlimehouse/Desktop/Dropbox/03 Projects Folder/Economic and Policy Analysis/Jobs and Drugs Poster/jndcode/JnD Data"
@@ -39,3 +40,30 @@
       usda0716unemp <- filter(usda0716unemp,!usda0716unemp$Metro_2013=="")
     ## Create Primary Data Set Object & Clean Up
       jobsanddrugs <- usda0716unemp
+      rm(usda0716unemp)
+    ## CDC Multiple Cause of Death Data - focused on Alcolhol and Opiods
+        ## Requested and downloaded from https://wonder.cdc.gov/mcd-icd10.html
+        ## Not available as a direct download due to government data restrictions
+      filename.1 <- "Multiple Cause of Death, 1999-2004.txt"
+      filename.2 <- "Multiple Cause of Death, 2005-2010.txt"
+      filename.3 <- "Multiple Cause of Death, 2011-2015.txt"
+      objectname <- "cdcmcd9915"
+      if (!exists(objectname)){ ## Doesn't work yet /fixme ##
+          cdcmcd9915 <- as.data.frame(read.csv2(file = filename.1,
+                                   sep = "\t",
+                                  header = TRUE))
+            cdcmcd9915 <- setdiff(cdcmcd9915, 
+                                as.data.frame(
+                                  read.csv2(file = filename.2,
+                                            sep = "\t",
+                                            header = TRUE)))
+            cdcmcd9915 <- filter(cdcmcd9915, cdcmcd9915$Notes=="")
+            cdcmcd9915 <- setdiff(cdcmcd9915, 
+                                  as.data.frame(
+                                    read.csv2(file = filename.3,
+                                              sep = "\t",
+                                              header = TRUE)))
+            }
+          
+      
+      
