@@ -5,7 +5,6 @@
     workdir <- "/Users/adamlimehouse/Desktop/Dropbox/03 Projects Folder/Economic and Policy Analysis/Jobs and Drugs Poster/jndcode/JnD Data"
     ## Set Working Directory
     setwd(workdir)
-    rm(workdir)
   ## Setup Packages
     library(xlsx) ## used later for xlsx data sets
     library(tidyverse) ## used later for csv data sets and for data cleaning and joining
@@ -25,12 +24,8 @@
       }
       ## Load the data into R
       if (!exists(objectname)){
-        FIPScodes <- read.xlsx2(file = filename,
-                                    sheetIndex = 1, 
-                                    startRow = 5,
-                                    as.data.frame = TRUE,
-                                    stringsasFactors = TRUE,
-                                    header = TRUE)
+        FIPScodes <- read.xlsx2(file = filename, sheetIndex = 1, startRow = 5,
+                                as.data.frame = TRUE, header = TRUE)
       }
       ## Cleanup
       gc() ## to help performance of the XLSX package
@@ -49,12 +44,14 @@
                                     sheetIndex = 1, 
                                     startRow = 10,
                                     as.data.frame = TRUE,
-                                    stringsasFactors = TRUE,
+                                    StringsAsFactors = TRUE,
                                     header = TRUE)
+        usda0716unemp$StringsAsFactors <- NULL
         }
       ## Defactor the numeric columns
       cols <- c(7:ncol(usda0716unemp))
       usda0716unemp[cols] <- lapply(usda0716unemp[cols], factorToNumeric)
+      rm(cols)
       ## Remove the aggregate state level data
       usda0716unemp <- filter(usda0716unemp,!usda0716unemp$Metro_2013=="")
       
@@ -87,29 +84,29 @@
         ## Requested and downloaded from https://wonder.cdc.gov/mcd-icd10.html
         ## Not available as a direct download due to government data restrictions
       objectname <- "cdcmcd9915"
-      if (!exists(objectname)){ ## Doesn't work yet /fixme ##
+      if (!exists(objectname)){ 
           filename.1 <- "Multiple Cause of Death, 1999-2004.txt"
           filename.2 <- "Multiple Cause of Death, 2005-2010.txt"
           filename.3 <- "Multiple Cause of Death, 2011-2015.txt"
-          drops <- c(1,10:11) # to remove Notes, County, crude rate, and crude std. err.
+          drops <- c(1) # to remove Notes, County, crude rate, and crude std. err.
           
           ## CDC Multiple Causes of Death, 1999-2004 / five years
           cdcmcd9904 <- as.data.frame(read.csv2(file = filename.1, sep = "\t", 
-                                                header = TRUE, stringsAsFactors = TRUE))
+                                                header = TRUE,colClasses = "factor"))
           cdcmcd9904[,drops] <- NULL ## Drops unnecessary columns
           cdcmcd9904$Deaths <- as.numeric(cdcmcd9904$Deaths) ## Compels numeric value
           cdcmcd9904$Population <- as.numeric(cdcmcd9904$Population) ## Compels numeric value
           
           ## CDC Multiple Causes of Death, 2005-2010 / six years
           cdcmcd0510 <- as.data.frame(read.csv2(file = filename.2, sep = "\t", 
-                                                header = TRUE, stringsAsFactors = TRUE))
+                                                header = TRUE, colClasses = "factor"))
           cdcmcd0510[,drops] <- NULL #Drops unnecessary columns
           cdcmcd0510$Deaths <- as.numeric(cdcmcd0510$Deaths) ## Compels numeric value
           cdcmcd0510$Population <- as.numeric(cdcmcd0510$Population) ## Compels numeric value
           
           ## CDC Multiple Causes of Death, 2011-2015 / five years
           cdcmcd1115 <- as.data.frame(read.csv2(file = filename.3, sep = "\t", 
-                                                header = TRUE, stringsAsFactors = TRUE))
+                                                header = TRUE, colClasses = "factor"))
           cdcmcd1115[, drops] <- NULL #Drops unnecessary columns
           cdcmcd1115$Deaths <- as.numeric(cdcmcd1115$Deaths) ## Compels numeric value
           cdcmcd1115$Population <- as.numeric(cdcmcd1115$Population) ## Compels numeric value
@@ -118,14 +115,14 @@
           cdcmcd9915 <- union(cdcmcd9904, cdcmcd0510) ## instead of bind.rows
           cdcmcd9915 <- union(cdcmcd9915, cdcmcd1115) ## instead of bind.rows
           cdcmcd9915$Year <- as.factor(cdcmcd9915$Year)
-          
+      
           ## Clean up
           rm(cdcmcd9904,cdcmcd0510, cdcmcd1115, filename.1, filename.2, filename.3, drops)
           gc()
-          
+          columnremoves <- c(2:3 , 5, 9:10)
+          cdcmcd9915[,columnremoves] <- NULL ## Remove unnecessary column
+## Doesn't work yet /fixme ##
           ## Widening the CDC Data on Drug, Alcohol, Other-cause Deaths by year
-          cdcmcd9915$UCD...Drug.Alcohol.Induced.Causes <- NULL ## Remove unnecessary column
-          cdcmcd9915$Year.Code <- NULL ## Remove unnecessary column
             ## Create "Other Deaths" filtered data set
           cdcmcd9915.O <- filter(cdcmcd9915, UCD...Drug.Alcohol.Induced.Causes.Code=="O")
           cdcmcd9915.O$UCD...Drug.Alcohol.Induced.Causes.Code <- NULL
@@ -139,22 +136,93 @@
             ## Create "Drug Deaths" filtered data set
           cdcmcd9915.D <- filter(cdcmcd9915, UCD...Drug.Alcohol.Induced.Causes.Code=="D")
           cdcmcd9915.D$UCD...Drug.Alcohol.Induced.Causes.Code <- NULL
-          colnames(cdcmcd9915.A)[colnames(cdcmcd9915.D)== 'Deaths'] <- 'drug.deaths'
-          colnames(cdcmcd9915.A)[colnames(cdcmcd9915.D)== 'Population'] <- 'drug.population'
-            ## Drop columns that are no longer necessary
-          cdcmcd9915[,c(3:5)] <- NULL
+          colnames(cdcmcd9915.D)[colnames(cdcmcd9915.D)== 'Deaths'] <- 'drug.deaths'
+          colnames(cdcmcd9915.D)[colnames(cdcmcd9915.D)== 'Population'] <- 'drug.population'
+      
             ## Rejoin the data sets together using Year and County.Code
-          joinvar <- c("Year","County")
+          joinvar <- c("Year","County.Code")
+          cdcmcd9915[,c(3:5)] <- NULL
           cdcmcd9915 <- full_join(cdcmcd9915,cdcmcd9915.O, by = joinvar)
           cdcmcd9915 <- full_join(cdcmcd9915,cdcmcd9915.A, by = joinvar)
           cdcmcd9915 <- full_join(cdcmcd9915,cdcmcd9915.D, by = joinvar)
+          columnremoves <- c(3:5, 7)
           rm(cdcmcd9915.O,cdcmcd9915.D,cdcmcd9915.A)
       }
       ## Bring jobsanddrugs and the CDC data set together
         ## full join on Year and FIPStxt
       
+##Fix ME      
+    ## SAMHDA (TEDS-A-1992-2012-DS000X) - Treatment Episode Data Set 1992 to 2012 (only downloads 1995 - 2012)
+        ## SAMHDA (TEDS-A-1992-2012-DS0002)
+        zipname <- "TEDS-A-1992-2012-DS0002-bndl-data-tsv.zip"
+        filename <- "TEDS-A-1992-2012-DS0002-data-excel.tsv"
+        fileURL <- "http://samhda.s3-us-gov-west-1.amazonaws.com/s3fs-public/field-uploads-protected/studies/TEDS-A-1992-2012/TEDS-A-1992-2012-datasets/TEDS-A-1992-2012-DS0002/TEDS-A-1992-2012-DS0002-bundles-with-study-info/TEDS-A-1992-2012-DS0002-bndl-data-tsv.zip"
+        objectname <- "TEDS.DS0002"
+        if (!file.exists(zipname)){
+          download.file(fileURL, zipname, method="curl")
+        }
+        if (!file.exists(filename)) { 
+          unzip(zipname)
+          setwd("/Users/adamlimehouse/Desktop/Dropbox/03 Projects Folder/Economic and Policy Analysis/Jobs and Drugs Poster/jndcode/JnD Data/TEDS-A-1992-2012-DS0002-bndl-data-tsv/TEDS-A-1992-2012-DS0002-data")
+        }
+        if (!exists(objectname)){
+          TEDS.DS0002 <- as.data.frame(read.csv2(file = filename, sep = "\t", 
+                                                             header = TRUE,colClasses = "factor"))
+        }
+        gc()
+        ## SAMHDA (TEDS-A-1992-2012-DS0003)
+        setwd(workdir)
+        zipname <- "TEDS-A-1992-2012-DS0003-bndl-data-tsv.zip"
+        filename <- "TEDS-A-1992-2012-DS0003-data-excel.tsv"
+        fileURL <- "http://samhda.s3-us-gov-west-1.amazonaws.com/s3fs-public/field-uploads-protected/studies/TEDS-A-1992-2012/TEDS-A-1992-2012-datasets/TEDS-A-1992-2012-DS0003/TEDS-A-1992-2012-DS0003-bundles-with-study-info/TEDS-A-1992-2012-DS0003-bndl-data-tsv.zip"
+        objectname <- "TEDS.DS0003"
+        if (!file.exists(zipname)){
+          download.file(fileURL, zipname, method="curl")
+        }
+        if (!file.exists(filename)) { 
+          unzip(zipname)
+          setwd("/Users/adamlimehouse/Desktop/Dropbox/03 Projects Folder/Economic and Policy Analysis/Jobs and Drugs Poster/jndcode/JnD Data/TEDS-A-1992-2012-DS0003-bndl-data-tsv/TEDS-A-1992-2012-DS0003-data")
+        }
+        if (!exists(objectname)){
+          TEDS.DS0002 <- as.data.frame(read.csv2(file = filename, sep = "\t", 
+                                                 header = TRUE,colClasses = "factor"))
+        }
+        gc()
         
+        ## SAMHDA (TEDS-A-1992-2012-DS0004)
+        setwd(workdir)
+        zipname <- "TEDS-A-1992-2012-DS0004-bndl-data-tsv.zip"
+        filename <- "TEDS-A-1992-2012-DS0004-data-excel.tsv"
+        fileURL <- "http://samhda.s3-us-gov-west-1.amazonaws.com/s3fs-public/field-uploads-protected/studies/TEDS-A-1992-2012/TEDS-A-1992-2012-datasets/TEDS-A-1992-2012-DS0004/TEDS-A-1992-2012-DS0004-bundles-with-study-info/TEDS-A-1992-2012-DS0004-bndl-data-tsv.zip"
+        objectname <- "TEDS.DS0004"
+        if (!file.exists(zipname)){
+          download.file(fileURL, zipname, method="curl")
+        }
+        if (!file.exists(filename)) { 
+          unzip(zipname)
+          setwd("/Users/adamlimehouse/Desktop/Dropbox/03 Projects Folder/Economic and Policy Analysis/Jobs and Drugs Poster/jndcode/JnD Data/TEDS-A-1992-2012-DS0004-bndl-data-tsv/TEDS-A-1992-2012-DS0004-data")
+        }
+        if (!exists(objectname)){
+          TEDS.DS0004 <- as.data.frame(read.csv2(file = filename, sep = "\t", 
+                                                 header = TRUE,colClasses = "factor"))
+        }
+        gc()
         
-          
-      
-      
+        ## SAMHDA (TEDS-A-1992-2012-DS0005)
+        setwd(workdir)
+        zipname <- "TEDS-A-1992-2012-DS0002-bndl-data-tsv.zip"
+        filename <- "TEDS-A-1992-2012-DS0002-data-excel.tsv"
+        fileURL <- "http://samhda.s3-us-gov-west-1.amazonaws.com/s3fs-public/field-uploads-protected/studies/TEDS-A-1992-2012/TEDS-A-1992-2012-datasets/TEDS-A-1992-2012-DS0005/TEDS-A-1992-2012-DS0005-bundles-with-study-info/TEDS-A-1992-2012-DS0005-bndl-data-tsv.zip"
+        objectname <- "TEDS.DS0005"
+        if (!file.exists(zipname)){
+          download.file(fileURL, zipname, method="curl")
+        }
+        if (!file.exists(filename)) { 
+          unzip(zipname)
+          setwd("/Users/adamlimehouse/Desktop/Dropbox/03 Projects Folder/Economic and Policy Analysis/Jobs and Drugs Poster/jndcode/JnD Data/TEDS-A-1992-2012-DS0005-bndl-data-tsv/TEDS-A-1992-2012-DS0005-data")
+        }
+        if (!exists(objectname)){
+          TEDS.DS0005 <- as.data.frame(read.csv2(file = filename, sep = "\t", 
+                                                 header = TRUE,colClasses = "factor"))
+        }
+        gc()
