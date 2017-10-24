@@ -112,8 +112,6 @@
         ## Requested and downloaded from https://wonder.cdc.gov/mcd-icd10.html
         ## Not available as a direct download due to government data restrictions
       objectname <- "cdcmcd9915"
-      
-## Doesn't work yet /fixme ##
       if (!exists(objectname)){ ## Doesn't work yet /fixme ##
 
           filename.1 <- "Multiple Cause of Death, 1999-2004.txt"
@@ -459,7 +457,7 @@
           ACS.GINI <- union(ACS.GINI,ACS.14)
           ACS.GINI <- union(ACS.GINI,ACS.15)
           ACS.GINI <- union(ACS.GINI,ACS.16)
-          ACS.GINI$YEAR <- as.factor(ACS.GINI$YEAR)s
+          ACS.GINI$YEAR <- as.factor(ACS.GINI$YEAR)
           setwd(workdir)
           filename <- "ACS_06_16_B19083_with_ann.csv"
           write_csv(ACS.GINI,path = filename)
