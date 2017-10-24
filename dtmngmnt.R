@@ -3,9 +3,9 @@
   ## ID & Set Working Directory
     ## Create WD Object, set as appopriate
     workdir <- "/Users/adamlimehouse/Desktop/Dropbox/03 Projects Folder/Economic and Policy Analysis/Jobs and Drugs Poster/jndcode/JnD Data"
-    ## Set Working Directory
+    ## Set Working Directory & final filename
     setwd(workdir)
-    rm(workdir)
+    jndflnm <- "JobsAndDrugs.csv"
   ## Setup Packages
     library(xlsx) ## used later for xlsx data sets
     library(tidyverse) ## used later for csv data sets and for data cleaning and joining
@@ -15,9 +15,9 @@
     
 ## ~~~ Section 2 - Pulling Data into R ~~~ ##
   ## Pulling Data into R - ~~~ NOTE: URLs not guaranteed current after Nov 2017 ~~~
-    
+
     ## 2016 FIPS Codes for future data managment
-      filename <- "all-geocodes-v2016.xlsx"
+      {filename <- "all-geocodes-v2016.xlsx"
       fileURL <- "https://www2.census.gov/programs-surveys/popest/geographies/2016/all-geocodes-v2016.xlsx"
       objectname <- "FIPScodes"
       ## Download the dataset:
@@ -35,9 +35,10 @@
       }
       ## Cleanup
       gc() ## to help improve performance of the code and decrease the chance of rJava erroring out.
+      }
     
     ## NBER CBSA to FIPS County Crosswalk
-    ## Used in working with the SAMHDA data later on
+    {## Used in working with the SAMHDA data later on
       filename <- "cbsa2fipsxw.csv"
       fileURL <- "https://www.nber.org/cbsa-csa-fips-county-crosswalk/cbsa2fipsxw.csv"
       objectname <- "CBSAtoFIPS"
@@ -57,9 +58,10 @@
       CBSAtoFIPS <- CBSAtoFIPS %>% filter(cbsacode!="")
       ## Cleanup
       gc() ## to help improve performance of the code and decrease the chance of rJava erroring out.
-
+    }
+    
     ## USDA Economic Research Service - Unemployment and median household income for the U.S., States, and counties, 2007-16
-      filename <- "USDA ERS Unemployment.xls"
+      {filename <- "USDA ERS Unemployment.xls"
       fileURL <- "https://www.ers.usda.gov/webdocs/DataFiles/48747/Unemployment.xls?v=42894"
       objectname <- "usda0716unemp"
       ## Download the dataset:
@@ -79,7 +81,7 @@
       cols <- c(7:ncol(usda0716unemp))
       usda0716unemp[cols] <- lapply(usda0716unemp[cols], factorToNumeric)
       ## Remove the aggregate state level data
-      usda0716unemp <- filter(usda0716unemp,!usda0716unemp$Metro_2013=="")
+      usda0716unemp <- filter(usda0716unemp,!usda0716unemp$Metro_2013=="")}
       
     ## Create Primary Data Set Object & Clean Up
       {
@@ -112,8 +114,7 @@
         ## Requested and downloaded from https://wonder.cdc.gov/mcd-icd10.html
         ## Not available as a direct download due to government data restrictions
       objectname <- "cdcmcd9915"
-      if (!exists(objectname)){ ## Doesn't work yet /fixme ##
-
+      if (!exists(objectname)){
           filename.1 <- "Multiple Cause of Death, 1999-2004.txt"
           filename.2 <- "Multiple Cause of Death, 2005-2010.txt"
           filename.3 <- "Multiple Cause of Death, 2011-2015.txt"
@@ -144,7 +145,6 @@
           cdcmcd9915 <- union(cdcmcd9904, cdcmcd0510) ## instead of bind.rows
           cdcmcd9915 <- union(cdcmcd9915, cdcmcd1115) ## instead of bind.rows
           cdcmcd9915$Year <- as.factor(cdcmcd9915$Year)
-          
           ## Clean up
           rm(cdcmcd9904,cdcmcd0510, cdcmcd1115, filename.1, filename.2, filename.3, drops)
           gc()
@@ -180,28 +180,35 @@
             ## Rejoin the data sets together using Year and County.Code
           {
           joinvar <- c("Year","County.Code")
-
           colnames(cdcmcd9915.A)[colnames(cdcmcd9915.D)== 'Deaths'] <- 'drug.deaths'
-          colnames(cdcmcd9915.A)[colnames(cdcmcd9915.D)== 'Population'] <- 'drug.population'
+          colnames(cdcmcd9915.A)[colnames(cdcmcd9915.D)== 'Population'] <- 'drug.population'}
             ## Drop columns that are no longer necessary
-
           cdcmcd9915[,c(3:5)] <- NULL
             ## Rejoin the data sets together using Year and County.Code
-          joinvar <- c("Year","County")
+          {joinvar <- c("Year","County")
           cdcmcd9915 <- full_join(cdcmcd9915,cdcmcd9915.O, by = joinvar)
           cdcmcd9915 <- full_join(cdcmcd9915,cdcmcd9915.A, by = joinvar)
           cdcmcd9915 <- full_join(cdcmcd9915,cdcmcd9915.D, by = joinvar)
-          rm(cdcmcd9915.O,cdcmcd9915.D,cdcmcd9915.A)
+          rm(cdcmcd9915.O,cdcmcd9915.D,cdcmcd9915.A, joinvar)
+          cdcmcd9915$Year.Code <- NULL ##unnecessary duplication
           }
       }
-      ## Bring jobsanddrugs and the CDC data set together
-        ## full join on Year and FIPStxt
-
-## Doesn't work yet /fixme ##
+      
+    ## Bring jobsanddrugs and the CDC data set together
+        ## left_join on Year and FIPStxt
+      {
+        names(cdcmcd9915)[names(cdcmcd9915) == 'County.Code'] <- 'FIPStxt'
+        jobsanddrugs <- left_join(jobsanddrugs,cdcmcd9915,c("FIPStxt","Year")) %>% group_by(FIPStxt)
+        rm(cdcmcd9915)
+      }
       
     ## SAMHDA (TEDS-A-1992-2012-DS000X) - Treatment Episode Data Set 1992 to 2012 (only downloads 1995 - 2012)
+      ## Link to parent series: https://datafiles.samhsa.gov/study/treatment-episode-data-set-admissions-teds-1992-2012-nid13582
+      ## Note:  These are very large files, as of 201710 between 500k and 990k records. They take a while to download
+      ##        and they take longer to unzip and then to load into R. "GC()" is included after each step to ensure that
+      ##     
         ## SAMHDA (TEDS-A-1992-2012-DS0002) - 1995-1999
-        zipname <- "TEDS-A-1992-2012-DS0002-bndl-data-tsv.zip"
+        {zipname <- "TEDS-A-1992-2012-DS0002-bndl-data-tsv.zip"
         filename <- "TEDS-A-1992-2012-DS0002-data-excel.tsv"
         fileURL <- "http://samhda.s3-us-gov-west-1.amazonaws.com/s3fs-public/field-uploads-protected/studies/TEDS-A-1992-2012/TEDS-A-1992-2012-datasets/TEDS-A-1992-2012-DS0002/TEDS-A-1992-2012-DS0002-bundles-with-study-info/TEDS-A-1992-2012-DS0002-bndl-data-tsv.zip"
         objectname <- "TEDS.DS0002"
@@ -216,9 +223,9 @@
           TEDS.DS0002 <- as.data.frame(read.csv2(file = filename, sep = "\t", 
                                                              header = TRUE,colClasses = "factor"))
         }
-        gc()
-        ## SAMHDA (TEDS-A-1992-2012-DS0003) 2000-2004
-        setwd(workdir)
+        gc()}
+        ## SAMHDA (TEDS-A-1992-2012-DS0003) - 2000-2004
+        {setwd(workdir)
         zipname <- "TEDS-A-1992-2012-DS0003-bndl-data-tsv.zip"
         filename <- "TEDS-A-1992-2012-DS0003-data-excel.tsv"
         fileURL <- "http://samhda.s3-us-gov-west-1.amazonaws.com/s3fs-public/field-uploads-protected/studies/TEDS-A-1992-2012/TEDS-A-1992-2012-datasets/TEDS-A-1992-2012-DS0003/TEDS-A-1992-2012-DS0003-bundles-with-study-info/TEDS-A-1992-2012-DS0003-bndl-data-tsv.zip"
@@ -234,14 +241,9 @@
           TEDS.DS0003 <- as.data.frame(read.csv2(file = filename, sep = "\t", 
                                                  header = TRUE,colClasses = "factor"))
         }
-        gc()
-        
-        ## SAMHDA (TEDS-A-1992-2012-DS0004) 2005-2009
-        ## Link to parent series: https://datafiles.samhsa.gov/study/treatment-episode-data-set-admissions-teds-1992-2012-nid13582
-        ## Note:  These are very large files, as of 201710 between 500k and 990k records. They take a while to download
-        ##        and they take longer to unzip and then to load into R. "GC()" is included after each step to ensure that
-        ##        
-        setwd(workdir)
+        gc()}
+        ## SAMHDA (TEDS-A-1992-2012-DS0004) - 2005-2009
+        {setwd(workdir)
         zipname <- "TEDS-A-1992-2012-DS0004-bndl-data-tsv.zip"
         filename <- "TEDS-A-1992-2012-DS0004-data-excel.tsv"
         fileURL <- "http://samhda.s3-us-gov-west-1.amazonaws.com/s3fs-public/field-uploads-protected/studies/TEDS-A-1992-2012/TEDS-A-1992-2012-datasets/TEDS-A-1992-2012-DS0004/TEDS-A-1992-2012-DS0004-bundles-with-study-info/TEDS-A-1992-2012-DS0004-bndl-data-tsv.zip"
@@ -257,10 +259,9 @@
           TEDS.DS0004 <- as.data.frame(read.csv2(file = filename, sep = "\t", 
                                                  header = TRUE,colClasses = "factor"))
         }
-        gc()
-        
-        ## SAMHDA (TEDS-A-1992-2012-DS0005) 2010-2012
-        setwd(workdir)
+        gc()}
+        ## SAMHDA (TEDS-A-1992-2012-DS0005) - 2010-2012
+        {setwd(workdir)
         zipname <- "TEDS-A-1992-2012-DS0005-bndl-data-tsv.zip"
         filename <- "TEDS-A-1992-2012-DS0005-data-excel.tsv"
         fileURL <- "http://samhda.s3-us-gov-west-1.amazonaws.com/s3fs-public/field-uploads-protected/studies/TEDS-A-1992-2012/TEDS-A-1992-2012-datasets/TEDS-A-1992-2012-DS0005/TEDS-A-1992-2012-DS0005-bundles-with-study-info/TEDS-A-1992-2012-DS0005-bndl-data-tsv.zip"
@@ -276,8 +277,7 @@
           TEDS.DS0005 <- as.data.frame(read.csv2(file = filename, sep = "\t", 
                                                  header = TRUE,colClasses = "factor"))
         }
-        gc()
-        
+        gc()}
         ## SAMHDA Data Management and Pruning
         OpiodsAdmissions <- c(5:7)
         groupingvars <- c("FIPStxt", "YEAR")
@@ -327,8 +327,16 @@
             rm(TEDS.DS0005)
             gc()
             } ## TEDS.DS0005
-            gc()
-            
+            {
+            TEDS.DS <- union(TEDS.DS0002.g, TEDS.DS0003.g)
+            TEDS.DS <- union(TEDS.DS, TEDS.DS0004.g) %>% union(TEDS.DS, TEDS.DS0005.g)
+            TEDS.DS$YEAR <- as.factor(TEDS.DS$YEAR)
+            TEDS.DS <- TEDS.DS %>% arrange(FIPStxt, CBSA, YEAR)
+            TEDS.DS %>% group_by(YEAR) %>% summarize(anncountavg = mean(casecount))
+            gc()} ## Creating TEDS.DS for joining to the larger jobsanddrugs datafile
+        rm(TEDS.DS0002.g, TEDS.DS0003.g, TEDS.DS0004.g, TEDS.DS0005.g) ## Clean UP
+        gc()
+        
     ## Census American Community Survey Data 2000 to 2015
       ## Requested from IPUMS and downloaded on 20171011; 
       ## Complete documentation of the file downloaded is available on GitHub including samples and variables
@@ -349,9 +357,10 @@
         }
         
         ## Summarize & transform the ACS_Data
-          ACS_Data_G <- ACS_Data %>% filter(complete.cases(ACS_Data)) %>% group_by(YEAR, STATEFIP, COUNTYFIPS)
           ACS_Data_Pop <- ACS_Data %>% filter(complete.cases(ACS_Data)) %>% group_by(YEAR, STATEFIP, COUNTYFIPS) %>%
                           summarise(n())
+          ACS_Data_White <- ACS_Data %>% filter(complete.cases(ACS_Data)) %>% group_by(YEAR, STATEFIP, COUNTYFIPS) %>%
+                          filter(RACE==1) %>% summarise(n())
           
     ## Census American Community Survey Data Aggregate Table - GINI Index by County 2006-2016
           {zipname <- "ACS_County_GINI_Index_2006-2016aff_download.zip"
@@ -464,5 +473,10 @@
           rm(ACS.06, ACS.07, ACS.08, ACS.09, ACS.10, ACS.11, ACS.12, ACS.13, ACS.14, ACS.15, ACS.16, 
             objectnames, filenames, Gini.folder, years)
           } ## Creates the ACS.GINI object out of the 11 files from Census.Gov
-          
+          ## Clean up ACS.GINI
+          ACS.GINI$Id <- NULL
+          names(ACS.GINI)[names(ACS.GINI) == 'Id2'] <- 'FIPStxt'
+          names(ACS.GINI)[names(ACS.GINI) == 'YEAR'] <- 'Year'
+          ACS.GINI$FIPStxt <- as.character(ACS.GINI$FIPStxt)
+          jobsanddrugs <- left_join(jobsanddrugs,ACS.GINI,c("FIPStxt","Year"))
           
