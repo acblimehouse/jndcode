@@ -10,6 +10,7 @@ jndflnm <- "JobsAndDrugs.csv"
 library(xlsx) ## used later for xlsx data sets
 library(survey) ## for working with the American Community Survey Microdata
 library(tidyverse) ## used later for csv data sets and for data cleaning and joining
+library(stringr) ## used with ACS data later
 library(srvyr) ## used later with survey and dplyr to create county lvl summaries of variables from ACS
 library(R.utils)
 
@@ -39,174 +40,174 @@ factorToNumeric <- function(f) as.numeric(levels(f))[as.integer(f)]
   ## Cleanup
   gc() ## to help improve performance of the code and decrease the chance of rJava erroring out.
 }
-## NBER CBSA to FIPS County Crosswalk
-{## Used in working with the SAMHDA data later on
-  filename <- "cbsa2fipsxw.csv"
-  fileURL <- "https://www.nber.org/cbsa-csa-fips-county-crosswalk/cbsa2fipsxw.csv"
-  objectname <- "CBSAtoFIPS"
-  ## Download the dataset:
-  if (!file.exists(filename)){
-    download.file(fileURL, filename, method="curl")
+  ## NBER CBSA to FIPS County Crosswalk
+      {## Used in working with the SAMHDA data later on
+    filename <- "cbsa2fipsxw.csv"
+    fileURL <- "https://www.nber.org/cbsa-csa-fips-county-crosswalk/cbsa2fipsxw.csv"
+    objectname <- "CBSAtoFIPS"
+    ## Download the dataset:
+    if (!file.exists(filename)){
+      download.file(fileURL, filename, method="curl")
+    }
+    ## Load the data into R
+    if (!exists(objectname)){
+      CBSAtoFIPS <- as.data.frame(read.csv2(file = filename, sep = ",", 
+                                            header = TRUE,colClasses = "factor"))
+    }
+    ## Creating County Level FIPS codes
+    CBSAtoFIPS$fipsstatecode <- as.character(CBSAtoFIPS$fipsstatecode)
+    CBSAtoFIPS$fipscountycode <- as.character(CBSAtoFIPS$fipscountycode)
+    CBSAtoFIPS$FIPStxt <- as.factor(with(CBSAtoFIPS, paste0(fipsstatecode, fipscountycode)))
+    CBSAtoFIPS <- CBSAtoFIPS %>% filter(cbsacode!="")
+    ## Cleanup
+    gc() ## to help improve performance of the code and decrease the chance of rJava erroring out.
   }
-  ## Load the data into R
+  ## USDA Economic Research Service - Unemployment and median household income for the U.S., States, and counties, 2007-16
+      {filename <- "USDA ERS Unemployment.xls"
+    fileURL <- "https://www.ers.usda.gov/webdocs/DataFiles/48747/Unemployment.xls?v=42894"
+    objectname <- "usda0716unemp"
+    ## Download the dataset:
+    if (!file.exists(filename)){
+      download.file(fileURL, filename, method="curl")
+    }
+    ## Load the data into R
+    if (!exists(objectname)){
+      usda0716unemp <- read.xlsx2(file = filename,
+                                  sheetIndex = 1, 
+                                  startRow = 10,
+                                  as.data.frame = TRUE,
+                                  stringsasFactors = TRUE,
+                                  header = TRUE)
+    }
+    ## Defactor the numeric columns
+    cols <- c(7:ncol(usda0716unemp))
+    usda0716unemp[cols] <- lapply(usda0716unemp[cols], factorToNumeric)
+    ## Remove the aggregate state level data
+    usda0716unemp <- filter(usda0716unemp,!usda0716unemp$Metro_2013=="")}
+  ## Create Primary Data Set Object & Clean Up
+      {
+    jobsanddrugs <- usda0716unemp
+    LongVar <- c("Civilian_labor_force", 
+                 "Employed", 
+                 "Unemployed", 
+                 "Unemployment_rate")
+    WideVar <- c("Civilian_labor_force_2007","Employed_2007","Unemployed_2007","Unemployment_rate_2007",
+                 "Civilian_labor_force_2008","Employed_2008","Unemployed_2008","Unemployment_rate_2008",
+                 "Civilian_labor_force_2009","Employed_2009","Unemployed_2009","Unemployment_rate_2009",
+                 "Civilian_labor_force_2010","Employed_2010","Unemployed_2010","Unemployment_rate_2010",
+                 "Civilian_labor_force_2011","Employed_2011","Unemployed_2011","Unemployment_rate_2011",
+                 "Civilian_labor_force_2012","Employed_2012","Unemployed_2012","Unemployment_rate_2012",
+                 "Civilian_labor_force_2013","Employed_2013","Unemployed_2013","Unemployment_rate_2013",
+                 "Civilian_labor_force_2014","Employed_2014","Unemployed_2014","Unemployment_rate_2014",
+                 "Civilian_labor_force_2015","Employed_2015","Unemployed_2015","Unemployment_rate_2015",
+                 "Civilian_labor_force_2016","Employed_2016","Unemployed_2016","Unemployment_rate_2016")
+    timesvar <- c("2007", "2008", "2009", "2010", "2011", "2012", "2013", "2014", "2015", "2016")
+    jobsanddrugs <- reshape(data = jobsanddrugs,direction = "long", varying = WideVar, v.names = LongVar,
+                            idvar = "FIPStxt", times = timesvar)
+    ## Renaming for later analysis and cleaning up
+    colnames(jobsanddrugs)[colnames(jobsanddrugs) == 'time'] <- 'Year'
+    jobsanddrugs$Year <- as.factor(jobsanddrugs$Year) 
+    rm(usda0716unemp,LongVar, WideVar)
+    jobsanddrugs$stringsasFactors <- NULL
+  }
+  ## CDC Multiple Cause of Death Data - focused on Alcolhol and Opiods
+  ## Requested and downloaded from https://wonder.cdc.gov/mcd-icd10.html
+  ## Not available as a direct download due to government data restrictions
+  objectname <- "cdcmcd9915"
   if (!exists(objectname)){
-    CBSAtoFIPS <- as.data.frame(read.csv2(file = filename, sep = ",", 
-                                          header = TRUE,colClasses = "factor"))
-  }
-  ## Creating County Level FIPS codes
-  CBSAtoFIPS$fipsstatecode <- as.character(CBSAtoFIPS$fipsstatecode)
-  CBSAtoFIPS$fipscountycode <- as.character(CBSAtoFIPS$fipscountycode)
-  CBSAtoFIPS$FIPStxt <- as.factor(with(CBSAtoFIPS, paste0(fipsstatecode, fipscountycode)))
-  CBSAtoFIPS <- CBSAtoFIPS %>% filter(cbsacode!="")
-  ## Cleanup
-  gc() ## to help improve performance of the code and decrease the chance of rJava erroring out.
-}
-## USDA Economic Research Service - Unemployment and median household income for the U.S., States, and counties, 2007-16
-{filename <- "USDA ERS Unemployment.xls"
-  fileURL <- "https://www.ers.usda.gov/webdocs/DataFiles/48747/Unemployment.xls?v=42894"
-  objectname <- "usda0716unemp"
-  ## Download the dataset:
-  if (!file.exists(filename)){
-    download.file(fileURL, filename, method="curl")
-  }
-  ## Load the data into R
-  if (!exists(objectname)){
-    usda0716unemp <- read.xlsx2(file = filename,
-                                sheetIndex = 1, 
-                                startRow = 10,
-                                as.data.frame = TRUE,
-                                stringsasFactors = TRUE,
-                                header = TRUE)
-  }
-  ## Defactor the numeric columns
-  cols <- c(7:ncol(usda0716unemp))
-  usda0716unemp[cols] <- lapply(usda0716unemp[cols], factorToNumeric)
-  ## Remove the aggregate state level data
-  usda0716unemp <- filter(usda0716unemp,!usda0716unemp$Metro_2013=="")}
-## Create Primary Data Set Object & Clean Up
-{
-  jobsanddrugs <- usda0716unemp
-  LongVar <- c("Civilian_labor_force", 
-               "Employed", 
-               "Unemployed", 
-               "Unemployment_rate")
-  WideVar <- c("Civilian_labor_force_2007","Employed_2007","Unemployed_2007","Unemployment_rate_2007",
-               "Civilian_labor_force_2008","Employed_2008","Unemployed_2008","Unemployment_rate_2008",
-               "Civilian_labor_force_2009","Employed_2009","Unemployed_2009","Unemployment_rate_2009",
-               "Civilian_labor_force_2010","Employed_2010","Unemployed_2010","Unemployment_rate_2010",
-               "Civilian_labor_force_2011","Employed_2011","Unemployed_2011","Unemployment_rate_2011",
-               "Civilian_labor_force_2012","Employed_2012","Unemployed_2012","Unemployment_rate_2012",
-               "Civilian_labor_force_2013","Employed_2013","Unemployed_2013","Unemployment_rate_2013",
-               "Civilian_labor_force_2014","Employed_2014","Unemployed_2014","Unemployment_rate_2014",
-               "Civilian_labor_force_2015","Employed_2015","Unemployed_2015","Unemployment_rate_2015",
-               "Civilian_labor_force_2016","Employed_2016","Unemployed_2016","Unemployment_rate_2016")
-  timesvar <- c("2007", "2008", "2009", "2010", "2011", "2012", "2013", "2014", "2015", "2016")
-  jobsanddrugs <- reshape(data = jobsanddrugs,direction = "long", varying = WideVar, v.names = LongVar,
-                          idvar = "FIPStxt", times = timesvar)
-  ## Renaming for later analysis and cleaning up
-  colnames(jobsanddrugs)[colnames(jobsanddrugs) == 'time'] <- 'Year'
-  jobsanddrugs$Year <- as.factor(jobsanddrugs$Year) 
-  rm(usda0716unemp,LongVar, WideVar)
-  jobsanddrugs$stringsasFactors <- NULL
-}
-## CDC Multiple Cause of Death Data - focused on Alcolhol and Opiods
-## Requested and downloaded from https://wonder.cdc.gov/mcd-icd10.html
-## Not available as a direct download due to government data restrictions
-objectname <- "cdcmcd9915"
-if (!exists(objectname)){
-  filename.1 <- "Multiple Cause of Death, 1999-2004.txt"
-  filename.2 <- "Multiple Cause of Death, 2005-2010.txt"
-  filename.3 <- "Multiple Cause of Death, 2011-2015.txt"
-  drops <- c(1,10:11) # to remove Notes, County, crude rate, and crude std. err.
-  
-  ## CDC Multiple Causes of Death, 1999-2004 / five years
-  cdcmcd9904 <- as.data.frame(read.csv2(file = filename.1, sep = "\t", 
-                                        header = TRUE, stringsAsFactors = TRUE))
-  cdcmcd9904[,drops] <- NULL ## Drops unnecessary columns
-  cdcmcd9904$Deaths <- as.numeric(cdcmcd9904$Deaths) ## Compels numeric value
-  cdcmcd9904$Population <- as.numeric(cdcmcd9904$Population) ## Compels numeric value
-  
-  ## CDC Multiple Causes of Death, 2005-2010 / six years
-  cdcmcd0510 <- as.data.frame(read.csv2(file = filename.2, sep = "\t", 
-                                        header = TRUE, stringsAsFactors = TRUE))
-  cdcmcd0510[,drops] <- NULL #Drops unnecessary columns
-  cdcmcd0510$Deaths <- as.numeric(cdcmcd0510$Deaths) ## Compels numeric value
-  cdcmcd0510$Population <- as.numeric(cdcmcd0510$Population) ## Compels numeric value
-  
-  ## CDC Multiple Causes of Death, 2011-2015 / five years
-  cdcmcd1115 <- as.data.frame(read.csv2(file = filename.3, sep = "\t", 
-                                        header = TRUE, stringsAsFactors = TRUE))
-  cdcmcd1115[, drops] <- NULL #Drops unnecessary columns
-  cdcmcd1115$Deaths <- as.numeric(cdcmcd1115$Deaths) ## Compels numeric value
-  cdcmcd1115$Population <- as.numeric(cdcmcd1115$Population) ## Compels numeric value
-  
-  ## Creating a unified file, CDC Multiple Causes of Death, 1999-2015
-  cdcmcd9915 <- union(cdcmcd9904, cdcmcd0510) ## instead of bind.rows
-  cdcmcd9915 <- union(cdcmcd9915, cdcmcd1115) ## instead of bind.rows
-  cdcmcd9915$Year <- as.factor(cdcmcd9915$Year)
-  ## Clean up
-  rm(cdcmcd9904,cdcmcd0510, cdcmcd1115, filename.1, filename.2, filename.3, drops)
-  gc()
-  
-  columnremoves <- c(2:3 , 5, 9:10)
-  cdcmcd9915[,columnremoves] <- NULL ## Remove unnecessary column
-  
-  ## Widening the CDC Data on Drug, Alcohol, Other-cause Deaths by year
-  cdcmcd9915$UCD...Drug.Alcohol.Induced.Causes <- NULL ## Remove unnecessary column
-  cdcmcd9915$Year.Code <- NULL ## Remove unnecessary column
-  ## Create "Other Deaths" filtered data set
-  {
-    cdcmcd9915.O <- filter(cdcmcd9915, UCD...Drug.Alcohol.Induced.Causes.Code=="O")
-    cdcmcd9915.O$UCD...Drug.Alcohol.Induced.Causes.Code <- NULL
-    colnames(cdcmcd9915.O)[colnames(cdcmcd9915.O)== 'Deaths'] <- 'other.deaths'
-    colnames(cdcmcd9915.O)[colnames(cdcmcd9915.O)== 'Population'] <- 'other.population'
-  }
-  ## Create "Alcohol Deaths" filtered data set
-  {
-    cdcmcd9915.A <- filter(cdcmcd9915, UCD...Drug.Alcohol.Induced.Causes.Code=="A")
-    cdcmcd9915.A$UCD...Drug.Alcohol.Induced.Causes.Code <- NULL
-    colnames(cdcmcd9915.A)[colnames(cdcmcd9915.A)== 'Deaths'] <- 'alcohol.deaths'
-    colnames(cdcmcd9915.A)[colnames(cdcmcd9915.A)== 'Population'] <- 'alcohol.population'
-  }
-  ## Create "Drug Deaths" filtered data set
-  {
-    cdcmcd9915.D <- filter(cdcmcd9915, UCD...Drug.Alcohol.Induced.Causes.Code=="D")
-    cdcmcd9915.D$UCD...Drug.Alcohol.Induced.Causes.Code <- NULL
+    filename.1 <- "Multiple Cause of Death, 1999-2004.txt"
+    filename.2 <- "Multiple Cause of Death, 2005-2010.txt"
+    filename.3 <- "Multiple Cause of Death, 2011-2015.txt"
+    drops <- c(1,10:11) # to remove Notes, crude rate, and crude std. err.
     
-    colnames(cdcmcd9915.D)[colnames(cdcmcd9915.D)== 'Deaths'] <- 'drug.deaths'
-    colnames(cdcmcd9915.D)[colnames(cdcmcd9915.D)== 'Population'] <- 'drug.population'
+    ## CDC Multiple Causes of Death, 1999-2004 / five years
+    {cdcmcd9904 <- as.data.frame(read.csv2(file = filename.1, sep = "\t", 
+                                          header = TRUE, colClasses = "character"))
+    cdcmcd9904[,drops] <- NULL ## Drops unnecessary columns
+    cdcmcd9904$Deaths <- as.numeric(cdcmcd9904$Deaths) ## Compels numeric value
+    cdcmcd9904$Population <- as.numeric(cdcmcd9904$Population) ## Compels numeric value
+    }
+    ## CDC Multiple Causes of Death, 2005-2010 / six years
+    {cdcmcd0510 <- as.data.frame(read.csv2(file = filename.2, sep = "\t", 
+                                          header = TRUE, colClasses = "character"))
+    cdcmcd0510[,drops] <- NULL #Drops unnecessary columns
+    cdcmcd0510$Deaths <- as.numeric(cdcmcd0510$Deaths) ## Compels numeric value
+    cdcmcd0510$Population <- as.numeric(cdcmcd0510$Population) ## Compels numeric value
+    }
+    ## CDC Multiple Causes of Death, 2011-2015 / five years
+    {cdcmcd1115 <- as.data.frame(read.csv2(file = filename.3, sep = "\t", 
+                                          header = TRUE, colClasses = "character"))
+    cdcmcd1115[, drops] <- NULL #Drops unnecessary columns
+    cdcmcd1115$Deaths <- as.numeric(cdcmcd1115$Deaths) ## Compels numeric value
+    cdcmcd1115$Population <- as.numeric(cdcmcd1115$Population) ## Compels numeric value
+    }
+    ## Creating a unified file, CDC Multiple Causes of Death, 1999-2015
+    cdcmcd9915 <- union(cdcmcd9904, cdcmcd0510) ## instead of bind.rows
+    cdcmcd9915 <- union(cdcmcd9915, cdcmcd1115) ## instead of bind.rows
+    cdcmcd9915$Year <- as.factor(cdcmcd9915$Year)
+    ## Clean up
+    rm(cdcmcd9904,cdcmcd0510, cdcmcd1115, filename.1, filename.2, filename.3, drops)
+    gc()
+    columnremoves <- c(2:3, 5) ## points to Year.Code & County Name
+    cdcmcd9915[,columnremoves] <- NULL ## Remove unnecessary column
+    
+    ## Widening the CDC Data on Drug, Alcohol, Other-cause Deaths by year
+        ## Create "Other Deaths" filtered data set
+        {
+          cdcmcd9915.O <- filter(cdcmcd9915, UCD...Drug.Alcohol.Induced.Causes.Code=="O")
+          cdcmcd9915.O$UCD...Drug.Alcohol.Induced.Causes.Code <- NULL
+          colnames(cdcmcd9915.O)[colnames(cdcmcd9915.O)== 'Deaths'] <- 'other.deaths'
+          colnames(cdcmcd9915.O)[colnames(cdcmcd9915.O)== 'Population'] <- 'other.population'
+        }
+        ## Create "Alcohol Deaths" filtered data set
+        {
+          cdcmcd9915.A <- filter(cdcmcd9915, UCD...Drug.Alcohol.Induced.Causes.Code=="A")
+          cdcmcd9915.A$UCD...Drug.Alcohol.Induced.Causes.Code <- NULL
+          colnames(cdcmcd9915.A)[colnames(cdcmcd9915.A)== 'Deaths'] <- 'alcohol.deaths'
+          colnames(cdcmcd9915.A)[colnames(cdcmcd9915.A)== 'Population'] <- 'alcohol.population'
+        }
+        ## Create "Drug Deaths" filtered data set
+        {
+          cdcmcd9915.D <- filter(cdcmcd9915, UCD...Drug.Alcohol.Induced.Causes.Code=="D")
+          cdcmcd9915.D$UCD...Drug.Alcohol.Induced.Causes.Code <- NULL
+          colnames(cdcmcd9915.D)[colnames(cdcmcd9915.D)== 'Deaths'] <- 'drug.deaths'
+          colnames(cdcmcd9915.D)[colnames(cdcmcd9915.D)== 'Population'] <- 'drug.population'
+        }
+        ## Rejoin the data sets together using Year and County.Code
+        {
+          joinvar <- c("Year","County.Code")
+          colnames(cdcmcd9915.A)[colnames(cdcmcd9915.D)== 'Deaths'] <- 'drug.deaths'
+          colnames(cdcmcd9915.A)[colnames(cdcmcd9915.D)== 'Population'] <- 'drug.population'}
+    ## Drop columns that are no longer necessary
+        cdcmcd9915[,c(3:5)] <- NULL ## Prep for full_joins in the next sub-section
+        
+    ## Rejoin the data sets together using Year and County.Code
+    {joinvar <- c("Year","County.Code")
+      cdcmcd9915 <- full_join(cdcmcd9915,cdcmcd9915.O, by = joinvar)
+      cdcmcd9915 <- full_join(cdcmcd9915,cdcmcd9915.A, by = joinvar)
+      cdcmcd9915 <- full_join(cdcmcd9915,cdcmcd9915.D, by = joinvar)
+      rm(cdcmcd9915.O,cdcmcd9915.D,cdcmcd9915.A, joinvar)
+      colnames(cdcmcd9915)[colnames(cdcmcd9915)== 'drug.population'] <- 'cdc.pop'
+      cdcmcd9915[,c(4,6)] <- NULL ## Removes duplicate population variables
+      cdcmcd9915$Year.Code <- NULL ##unnecessary duplication
+      cdcmcd9915$FIPStxt <- as.factor(cdcmcd9915$FIPStxt)
+      cdcmcd9915 <- cdcmcd9915 %>% distinct()
+    }
   }
-  ## Rejoin the data sets together using Year and County.Code
+  ## Bring jobsanddrugs and the CDC data set together
   {
-    joinvar <- c("Year","County.Code")
-    colnames(cdcmcd9915.A)[colnames(cdcmcd9915.D)== 'Deaths'] <- 'drug.deaths'
-    colnames(cdcmcd9915.A)[colnames(cdcmcd9915.D)== 'Population'] <- 'drug.population'}
-  ## Drop columns that are no longer necessary
-  cdcmcd9915[,c(3:5)] <- NULL
-  ## Rejoin the data sets together using Year and County.Code
-  {joinvar <- c("Year","County.Code")
-    cdcmcd9915 <- full_join(cdcmcd9915,cdcmcd9915.O, by = joinvar)
-    cdcmcd9915 <- full_join(cdcmcd9915,cdcmcd9915.A, by = joinvar)
-    cdcmcd9915 <- full_join(cdcmcd9915,cdcmcd9915.D, by = joinvar)
-    rm(cdcmcd9915.O,cdcmcd9915.D,cdcmcd9915.A, joinvar)
-    cdcmcd9915$Year.Code <- NULL ##unnecessary duplication
-    cdcmcd9915$FIPStxt <- as.factor(cdcmcd9915$FIPStxt)
-  }
-}
-## Bring jobsanddrugs and the CDC data set together
-## left_join on Year and FIPStxt
-{
   names(cdcmcd9915)[names(cdcmcd9915) == 'County.Code'] <- 'FIPStxt'
   jobsanddrugs <- left_join(jobsanddrugs,cdcmcd9915,c("FIPStxt","Year")) %>% group_by(FIPStxt)
   rm(cdcmcd9915)
-}
+} ## left_join on Year and FIPStxt
 
 ## SAMHDA (TEDS-A-1992-2012-DS000X) - Treatment Episode Data Set 1992 to 2012 (only downloads 1995 - 2012)
 ## Link to parent series: https://datafiles.samhsa.gov/study/treatment-episode-data-set-admissions-teds-1992-2012-nid13582
 ## Note:  These are very large files, as of 201710 between 500k and 990k records. They take a while to download
 ##        and they take longer to unzip and then to load into R. "GC()" is included after each step to ensure that
-##     
-    ## SAMHDA (TEDS-A-1992-2012-DS0002) - 1995-1999
+##
+{
+   ## SAMHDA (TEDS-A-1992-2012-DS0002) - 1995-1999
     {zipname <- "TEDS-A-1992-2012-DS0002-bndl-data-tsv.zip"
       filename <- "TEDS-A-1992-2012-DS0002-data-excel.tsv"
       fileURL <- "http://samhda.s3-us-gov-west-1.amazonaws.com/s3fs-public/field-uploads-protected/studies/TEDS-A-1992-2012/TEDS-A-1992-2012-datasets/TEDS-A-1992-2012-DS0002/TEDS-A-1992-2012-DS0002-bundles-with-study-info/TEDS-A-1992-2012-DS0002-bndl-data-tsv.zip"
@@ -335,9 +336,11 @@ if (!exists(objectname)){
       gc()} ## Creating TEDS.DS for joining to the larger jobsanddrugs datafile
     {rm(TEDS.DS0002.g, TEDS.DS0003.g, TEDS.DS0004.g, TEDS.DS0005.g)
     gc()} ## Clean UP
+}
 
 
 ## Census American Community Survey Data 2000 to 2015
+    ## Would have been easier with the _lodown_, see this link: <http://asdfree.com/american-community-survey-acs.html>
 ## Requested from IPUMS and downloaded on 20171011; 
 ## Complete documentation of the file downloaded is available on GitHub including samples and variables
     {## Steven Ruggles, Katie Genadek, Ronald Goeken, Josiah Grover, and Matthew Sobek. 
@@ -347,7 +350,7 @@ if (!exists(objectname)){
       setwd(workdir)
       zipname <- "usa_00001.csv.gz"
       filename <- "usa_00001.csv"
-      objectname <- "ACS_Data_c_wghtd"
+      objectname <- "ACS_Data_c"
     ## Unzipping the GZ
     if (!file.exists(filename)){
       bunzip2(zipname, filename, remove = FALSE, skip = TRUE)
@@ -359,19 +362,30 @@ if (!exists(objectname)){
       gc()
       ACS_Data_c$PERWT <- as.numeric(ACS_Data_c$PERWT)
       ACS_Data_c$PERNUM <- as.numeric(ACS_Data_c$PERNUM)
-      ACS_Data_c$STATEFIP <- as.integer(ACS_Data_c$STATEFIP)
-      ACS_Data_c$COUNTYFIPS <- as.integer(ACS_Data_c$COUNTYFIPS)
-      ACS_Data_c_wghtd <- ACS_Data_c %>% as_survey(ids = PERNUM, weight = PERWT)
+      ACS_Data_c$STATEFIP <- as.character(ACS_Data_c$STATEFIP)
+      ACS_Data_c$COUNTYFIPS <- as.character(ACS_Data_c$COUNTYFIPS)
+      require(stringr)
+      ACS_Data_c$COUNTYFIPS <- str_pad(ACS_Data_c$COUNTYFIPS, 3, side = "left", pad = "0")
+      ACS_Data_c <- ACS_Data_c %>% mutate(FIPStxt = paste(STATEFIP, COUNTYFIPS, collapse = ""))
+      gc()
     }
-
+    ## Create the Survey file and remove the flat file
+      objectname <- "ACS_Data_c_wghtd"
+      if (!exists(objectname)){
+      ACS_Data_c_wghtd <- ACS_Data_c %>% as_survey(ids = PERNUM, weight = PERWT)
+      } ## This will take a while.
 ## Summarize & transform the ACS_Data
-ACS_Data_Pop <- ACS_Data %>% filter(complete.cases(ACS_Data)) %>% group_by(YEAR, STATEFIP, COUNTYFIPS) %>%
-  summarise(n())
-ACS_Data_White <- ACS_Data %>% filter(complete.cases(ACS_Data)) %>% group_by(YEAR, STATEFIP, COUNTYFIPS) %>%
-  filter(RACE==1) %>% summarise(n())
+    ACS_Data_avgage <- ACS_Data_c_wghtd %>% group_by(YEAR) %>% group_by(FIPStxt) %>% summarize(avgage = survey_mean()) 
+    ACS_Data_c_wghtd <- ACS_Data_c_wghtd %>% 
+    ACS_Data_White <- ACS_Data_c_wghtd %>% group_by(RACE) %>% summarize(proportion = survey_mean(),
+                      total = survey_total())
 
 
 ## Census American Community Survey Data Aggregate Table - GINI Index by County 2006-2016
+## Downloaded from Census.Gov FactFinder Query tool
+## Link: https://factfinder.census.gov/faces/nav/jsf/pages/searchresults.xhtml?refresh=t
+## Download the saved search here: https://www.dropbox.com/s/teeks2u3y8zh21q/CountyLvlGINISearch.aff?dl=0
+## Open the saved search through the advanced search feature of FactFinder and download to your working directory
     {zipname <- "ACS_County_GINI_Index_2006-2016aff_download.zip"
       Gini.folder <- "/Users/adamlimehouse/Desktop/Dropbox/03 Projects Folder/Economic and Policy Analysis/Jobs and Drugs Poster/jndcode/JnD Data/ACS_County_GINI_Index_2006-2016aff_download"
       filenames <- c("ACS_06_EST_B19083_with_ann.csv", "ACS_07_1YR_B19083_with_ann.csv", "ACS_08_1YR_B19083_with_ann.csv",
@@ -381,6 +395,7 @@ ACS_Data_White <- ACS_Data %>% filter(complete.cases(ACS_Data)) %>% group_by(YEA
       objectnames <- c("ACS.06","ACS.07","ACS.08","ACS.09","ACS.10",
                        "ACS.11","ACS.12","ACS.13","ACS.14","ACS.15","ACS.16")
       years <- c("2006", "2007", "2008", "2009", "2010", "2011", "2012", "2013", "2014", "2015", "2016")} ## Variables names for the GINI object creation 
+    
     ## Create the annual file dataframes, join the tables, create a new complete file
       if (!file.exists(zipname)){
         stop("Download ACS tables B19083 from Census.Gov at the county level")
@@ -488,3 +503,7 @@ ACS_Data_White <- ACS_Data %>% filter(complete.cases(ACS_Data)) %>% group_by(YEA
       names(ACS.GINI)[names(ACS.GINI) == 'YEAR'] <- 'Year'
       ACS.GINI$FIPStxt <- as.character(ACS.GINI$FIPStxt)
       jobsanddrugs <- left_join(jobsanddrugs,ACS.GINI,c("FIPStxt","Year"))}
+
+## Saving the data to file
+   setwd(workdir)
+   write_csv(jobsanddrugs, path = jndflnm, na = "NA")

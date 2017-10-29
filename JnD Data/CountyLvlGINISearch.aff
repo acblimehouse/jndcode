@@ -1,0 +1,7 @@
+<query schema-version="1.0" lang="en" type="search" sig="TFvMo9tt4fgIdC4thydVVGL00y4">
+  <search-config>
+    <text-search>B19083</text-search>
+    <category-search type="geo" summary-level-code="040" name="All States within United States and Puerto Rico"/>
+    <category-search type="geo" summary-level-code="050" name="All Counties within United States and Puerto Rico"/>
+  </search-config>
+</query>
