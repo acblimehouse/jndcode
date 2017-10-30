@@ -5,13 +5,11 @@
 workdir <- "/Users/adamlimehouse/Desktop/Dropbox/03 Projects Folder/Economic and Policy Analysis/Jobs and Drugs Poster/jndcode/JnD Data"
 ## Set Working Directory & final filename
 setwd(workdir)
-jndflnm <- "JobsAndDrugs.csv"
+
 ## Setup Packages
 library(xlsx) ## used later for xlsx data sets
-library(survey) ## for working with the American Community Survey Microdata
 library(tidyverse) ## used later for csv data sets and for data cleaning and joining
 library(stringr) ## used with ACS data later
-library(srvyr) ## used later with survey and dplyr to create county lvl summaries of variables from ACS
 library(R.utils)
 
 ## Add useful functions
@@ -37,8 +35,6 @@ factorToNumeric <- function(f) as.numeric(levels(f))[as.integer(f)]
                             stringsasFactors = TRUE,
                             header = TRUE)
   }
-  ## Cleanup
-  gc() ## to help improve performance of the code and decrease the chance of rJava erroring out.
 }
   ## NBER CBSA to FIPS County Crosswalk
       {## Used in working with the SAMHDA data later on
@@ -180,9 +176,8 @@ factorToNumeric <- function(f) as.numeric(levels(f))[as.integer(f)]
           colnames(cdcmcd9915.A)[colnames(cdcmcd9915.D)== 'Population'] <- 'drug.population'}
     ## Drop columns that are no longer necessary
         cdcmcd9915[,c(3:5)] <- NULL ## Prep for full_joins in the next sub-section
-        
     ## Rejoin the data sets together using Year and County.Code
-    {joinvar <- c("Year","County.Code")
+      joinvar <- c("Year","County.Code")
       cdcmcd9915 <- full_join(cdcmcd9915,cdcmcd9915.O, by = joinvar)
       cdcmcd9915 <- full_join(cdcmcd9915,cdcmcd9915.A, by = joinvar)
       cdcmcd9915 <- full_join(cdcmcd9915,cdcmcd9915.D, by = joinvar)
@@ -190,25 +185,25 @@ factorToNumeric <- function(f) as.numeric(levels(f))[as.integer(f)]
       colnames(cdcmcd9915)[colnames(cdcmcd9915)== 'drug.population'] <- 'cdc.pop'
       cdcmcd9915[,c(4,6)] <- NULL ## Removes duplicate population variables
       cdcmcd9915$Year.Code <- NULL ##unnecessary duplication
+      names(cdcmcd9915)[names(cdcmcd9915) == 'County.Code'] <- 'FIPStxt'
       cdcmcd9915$FIPStxt <- as.factor(cdcmcd9915$FIPStxt)
       cdcmcd9915 <- cdcmcd9915 %>% distinct()
-    }
-  }
+     }
   ## Bring jobsanddrugs and the CDC data set together
   {
-  names(cdcmcd9915)[names(cdcmcd9915) == 'County.Code'] <- 'FIPStxt'
   jobsanddrugs <- left_join(jobsanddrugs,cdcmcd9915,c("FIPStxt","Year")) %>% group_by(FIPStxt)
   rm(cdcmcd9915)
-} ## left_join on Year and FIPStxt
-
+  } ## left_join on Year and FIPStxt
+  ## Cleanup
+  rm(cols, columnremoves, joinvar, timesvar)
+  
 ## SAMHDA (TEDS-A-1992-2012-DS000X) - Treatment Episode Data Set 1992 to 2012 (only downloads 1995 - 2012)
 ## Link to parent series: https://datafiles.samhsa.gov/study/treatment-episode-data-set-admissions-teds-1992-2012-nid13582
 ## Note:  These are very large files, as of 201710 between 500k and 990k records. They take a while to download
 ##        and they take longer to unzip and then to load into R. "GC()" is included after each step to ensure that
-##
-{
-   ## SAMHDA (TEDS-A-1992-2012-DS0002) - 1995-1999
-    {zipname <- "TEDS-A-1992-2012-DS0002-bndl-data-tsv.zip"
+##        the XLSX package and rJAVA don't have memory issues.
+    ## SAMHDA (TEDS-A-1992-2012-DS0002) - 1995-1999
+    { zipname <- "TEDS-A-1992-2012-DS0002-bndl-data-tsv.zip"
       filename <- "TEDS-A-1992-2012-DS0002-data-excel.tsv"
       fileURL <- "http://samhda.s3-us-gov-west-1.amazonaws.com/s3fs-public/field-uploads-protected/studies/TEDS-A-1992-2012/TEDS-A-1992-2012-datasets/TEDS-A-1992-2012-DS0002/TEDS-A-1992-2012-DS0002-bundles-with-study-info/TEDS-A-1992-2012-DS0002-bndl-data-tsv.zip"
       objectname <- "TEDS.DS0002"
@@ -221,7 +216,7 @@ factorToNumeric <- function(f) as.numeric(levels(f))[as.integer(f)]
       }
       if (!exists(objectname)){
         TEDS.DS0002 <- as.data.frame(read.csv2(file = filename, sep = "\t", 
-                                               header = TRUE,colClasses = "factor"))
+                                               header = TRUE,colClasses = "character"))
       }
       gc()}
     ## SAMHDA (TEDS-A-1992-2012-DS0003) - 2000-2004
@@ -239,7 +234,7 @@ factorToNumeric <- function(f) as.numeric(levels(f))[as.integer(f)]
       }
       if (!exists(objectname)){
         TEDS.DS0003 <- as.data.frame(read.csv2(file = filename, sep = "\t", 
-                                               header = TRUE,colClasses = "factor"))
+                                               header = TRUE,colClasses = "character"))
       }
       gc()}
     ## SAMHDA (TEDS-A-1992-2012-DS0004) - 2005-2009
@@ -257,7 +252,7 @@ factorToNumeric <- function(f) as.numeric(levels(f))[as.integer(f)]
       }
       if (!exists(objectname)){
         TEDS.DS0004 <- as.data.frame(read.csv2(file = filename, sep = "\t", 
-                                               header = TRUE,colClasses = "factor"))
+                                               header = TRUE,colClasses = "character"))
       }
       gc()}
     ## SAMHDA (TEDS-A-1992-2012-DS0005) - 2010-2012
@@ -275,112 +270,156 @@ factorToNumeric <- function(f) as.numeric(levels(f))[as.integer(f)]
       }
       if (!exists(objectname)){
         TEDS.DS0005 <- as.data.frame(read.csv2(file = filename, sep = "\t", 
-                                               header = TRUE,colClasses = "factor"))
+                                               header = TRUE,colClasses = "character"))
       }
       gc()}
-  ## SAMHDA Data Management and Pruning
-    OpiodsAdmissions <- c(5:7)
-    groupingvars <- c("FIPStxt", "YEAR")
+    ## SAMHDA Data Management and Pruning
+      OpiodsAdmissions <- c(5:7)
+      groupingvars <- c("FIPStxt", "YEAR")
     ## CBSAtoFIPS_SAMHDA_Subset
-    {
-  objectname <- "CBSAtoFIPS_SAMHDA_Subset"
-  if (!exists(objectname)){
-    cols <- c(1,13)
-    CBSAtoFIPS_SAMHDA_Subset <- CBSAtoFIPS[,cols]
-    colnames(CBSAtoFIPS_SAMHDA_Subset)[colnames(CBSAtoFIPS_SAMHDA_Subset) == 'cbsacode'] <- 'CBSA'
-  }
-}
+      objectname <- "CBSAtoFIPS_SAMHDA_Subset"
+      if (!exists(objectname)){
+        cols <- c(1,13)
+        CBSAtoFIPS_SAMHDA_Subset <- CBSAtoFIPS[,cols]
+        colnames(CBSAtoFIPS_SAMHDA_Subset)[colnames(CBSAtoFIPS_SAMHDA_Subset) == 'cbsacode'] <- 'CBSA'
+      }
     ## Filtering down to Opioid Cases, Left_Joining FIPStxt, and then Aggregating case counts by FIPStxt and Year
-    {    
-      TEDS.DS0002 <- TEDS.DS0002 %>% filter(SUB1==OpiodsAdmissions)
-      TEDS.DS0002 <- left_join(x = TEDS.DS0002, y = CBSAtoFIPS_SAMHDA_Subset, by = "CBSA")
-      TEDS.DS0002.g <- TEDS.DS0002 %>% filter(SUB1 != -9, CBSA != -9) %>% 
-        group_by(FIPStxt, CBSA, YEAR) %>% 
-        summarise(casecount = sum(!is.na(SUB1)))
-      rm(TEDS.DS0002)
-      gc()
-} ## TEDS.DS0002
-    {
-      TEDS.DS0003 <- TEDS.DS0003 %>% filter(SUB1==OpiodsAdmissions) 
-      TEDS.DS0003 <- left_join(x = TEDS.DS0003, y = CBSAtoFIPS_SAMHDA_Subset, by = "CBSA")
-      TEDS.DS0003.g <- TEDS.DS0003 %>% filter(SUB1 != -9, CBSA != -9) %>% 
-        group_by(FIPStxt, CBSA, YEAR) %>% 
-        summarise(casecount = sum(!is.na(SUB1)))
-      rm(TEDS.DS0003)
-      gc()
-} ## TEDS.DS0003
-    {
-      TEDS.DS0004 <- TEDS.DS0004 %>% filter(SUB1==OpiodsAdmissions)
-      TEDS.DS0004 <- left_join(x = TEDS.DS0004, y = CBSAtoFIPS_SAMHDA_Subset, by = "CBSA")
-      TEDS.DS0004.g <- TEDS.DS0004 %>% filter(SUB1 != -9, CBSA != -9) %>% 
-        group_by(FIPStxt, CBSA, YEAR) %>% 
-        summarise(casecount = sum(!is.na(SUB1)))
-      rm(TEDS.DS0004)
-      gc()
-} ## TEDS.DS0004
-    {
-      TEDS.DS0005 <- TEDS.DS0005 %>% filter(SUB1==OpiodsAdmissions)
-      TEDS.DS0005 <- left_join(x = TEDS.DS0005, y = CBSAtoFIPS_SAMHDA_Subset, by = "CBSA")
-      TEDS.DS0005.g <- TEDS.DS0005 %>% filter(SUB1 != -9, CBSA != -9) %>% 
-        group_by(FIPStxt, CBSA, YEAR) %>% 
-        summarise(casecount = sum(!is.na(SUB1)))
-      rm(TEDS.DS0005)
-      gc()
-} ## TEDS.DS0005
-    {
-      TEDS.DS <- union(TEDS.DS0002.g, TEDS.DS0003.g)
-      TEDS.DS <- union(TEDS.DS, TEDS.DS0004.g) %>% union(TEDS.DS, TEDS.DS0005.g)
-      TEDS.DS$YEAR <- as.factor(TEDS.DS$YEAR)
-      TEDS.DS <- TEDS.DS %>% arrange(FIPStxt, CBSA, YEAR)
-      TEDS.DS.GeoSum <- TEDS.DS %>% group_by(FIPStxt) %>% summarize(anncountavg = mean(casecount))
-      gc()} ## Creating TEDS.DS for joining to the larger jobsanddrugs datafile
-    {rm(TEDS.DS0002.g, TEDS.DS0003.g, TEDS.DS0004.g, TEDS.DS0005.g)
-    gc()} ## Clean UP
-}
-
+    ## TEDS.DS0002
+      {    
+        TEDS.DS0002 <- TEDS.DS0002 %>% filter(SUB1==OpiodsAdmissions)
+        TEDS.DS0002 <- left_join(x = TEDS.DS0002, y = CBSAtoFIPS_SAMHDA_Subset, by = "CBSA")
+        TEDS.DS0002.g <- TEDS.DS0002 %>% filter(SUB1 != -9, CBSA != -9) %>% 
+          group_by(FIPStxt, CBSA, YEAR) %>% 
+          summarise(casecount = sum(!is.na(SUB1)))
+        rm(TEDS.DS0002)
+        gc()
+      } 
+    ## TEDS.DS0003
+      {
+        TEDS.DS0003 <- TEDS.DS0003 %>% filter(SUB1==OpiodsAdmissions) 
+        TEDS.DS0003 <- left_join(x = TEDS.DS0003, y = CBSAtoFIPS_SAMHDA_Subset, by = "CBSA")
+        TEDS.DS0003.g <- TEDS.DS0003 %>% filter(SUB1 != -9, CBSA != -9) %>% 
+          group_by(FIPStxt, CBSA, YEAR) %>% 
+          summarise(casecount = sum(!is.na(SUB1)))
+        rm(TEDS.DS0003)
+        gc()
+      } 
+    ## TEDS.DS0004
+      {
+        TEDS.DS0004 <- TEDS.DS0004 %>% filter(SUB1==OpiodsAdmissions)
+        TEDS.DS0004 <- left_join(x = TEDS.DS0004, y = CBSAtoFIPS_SAMHDA_Subset, by = "CBSA")
+        TEDS.DS0004.g <- TEDS.DS0004 %>% filter(SUB1 != -9, CBSA != -9) %>% 
+          group_by(FIPStxt, CBSA, YEAR) %>% 
+          summarise(casecount = sum(!is.na(SUB1)))
+        rm(TEDS.DS0004)
+        gc()
+      } 
+    ## TEDS.DS0005
+      {
+        TEDS.DS0005 <- TEDS.DS0005 %>% filter(SUB1==OpiodsAdmissions)
+        TEDS.DS0005 <- left_join(x = TEDS.DS0005, y = CBSAtoFIPS_SAMHDA_Subset, by = "CBSA")
+        TEDS.DS0005.g <- TEDS.DS0005 %>% filter(SUB1 != -9, CBSA != -9) %>% 
+          group_by(FIPStxt, CBSA, YEAR) %>% 
+          summarise(casecount = sum(!is.na(SUB1)))
+        rm(TEDS.DS0005)
+        gc()
+      } 
+    ## Creating TEDS.DS for joining to the larger jobsanddrugs datafile
+      {
+        TEDS.DS <- union(TEDS.DS0002.g, TEDS.DS0003.g)
+        TEDS.DS <- union(TEDS.DS, TEDS.DS0004.g)
+        TEDS.DS <- union(TEDS.DS, TEDS.DS0005.g)
+        TEDS.DS$YEAR <- as.factor(TEDS.DS$YEAR)
+        TEDS.DS <- TEDS.DS %>% arrange(FIPStxt, CBSA, YEAR)
+        gc()} 
+    ## Clean UP
+      rm(TEDS.DS0002.g, TEDS.DS0003.g, TEDS.DS0004.g, TEDS.DS0005.g, CBSAtoFIPS_SAMHDA_Subset)
+      colnames(TEDS.DS)[colnames(TEDS.DS)== 'YEAR'] <- 'Year'
+    ## Joining to JobsandDrugs  
+    { joinvar <- c("FIPStxt","Year")
+      jobsanddrugs <- left_join(jobsanddrugs, TEDS.DS, by = joinvar)
+      rm(TEDS.DS, groupingvars, joinvar, OpiodsAdmissions) ## Final SAMDHA cleanup
+    } 
 
 ## Census American Community Survey Data 2000 to 2015
-    ## Would have been easier with the _lodown_, see this link: <http://asdfree.com/american-community-survey-acs.html>
-## Requested from IPUMS and downloaded on 20171011; 
-## Complete documentation of the file downloaded is available on GitHub including samples and variables
-    {## Steven Ruggles, Katie Genadek, Ronald Goeken, Josiah Grover, and Matthew Sobek. 
+    ## Requested from IPUMS and downloaded on 20171011; 
+    ## Complete documentation of the file downloaded is available on GitHub including samples and variables
+      {## Steven Ruggles, Katie Genadek, Ronald Goeken, Josiah Grover, and Matthew Sobek. 
       ## Integrated Public Use Microdata Series: Version 7.0 [dataset]. Minneapolis, MN: University of Minnesota, 2017. 
       ##  https://doi.org/10.18128/D010.V7.0
     } ## IPUMS Citation
-      setwd(workdir)
+    ## Setup  
+      {setwd(workdir)
       zipname <- "usa_00001.csv.gz"
       filename <- "usa_00001.csv"
-      objectname <- "ACS_Data_c"
+      objectname <- "ACS_Data_c"}
     ## Unzipping the GZ
     if (!file.exists(filename)){
       bunzip2(zipname, filename, remove = FALSE, skip = TRUE)
     }
     if (!exists(objectname)){
-      ACS_Data <- read.csv(filename, header = TRUE, colClasses = "factor", na.strings = "na")
-      ACS_Data_c <- ACS_Data %>% filter(COUNTYFIPS!="")
-      rm(ACS_Data)
+      ACS_Data_c <- read.csv(filename, header = TRUE, colClasses = "character", na.strings = "na")
+      ACS_Data_c <- ACS_Data_c %>% filter(COUNTYFIPS!="")
+      ACS_col_drops <- c(14, 16, 23, 26:28, 31)
+      ACS_Data_c[,ACS_col_drops] <- NULL
+      rm(ACS_col_drops)
       gc()
-      ACS_Data_c$PERWT <- as.numeric(ACS_Data_c$PERWT)
-      ACS_Data_c$PERNUM <- as.numeric(ACS_Data_c$PERNUM)
-      ACS_Data_c$STATEFIP <- as.character(ACS_Data_c$STATEFIP)
-      ACS_Data_c$COUNTYFIPS <- as.character(ACS_Data_c$COUNTYFIPS)
-      require(stringr)
-      ACS_Data_c$COUNTYFIPS <- str_pad(ACS_Data_c$COUNTYFIPS, 3, side = "left", pad = "0")
-      ACS_Data_c <- ACS_Data_c %>% mutate(FIPStxt = paste(STATEFIP, COUNTYFIPS, collapse = ""))
-      gc()
-    }
-    ## Create the Survey file and remove the flat file
-      objectname <- "ACS_Data_c_wghtd"
-      if (!exists(objectname)){
-      ACS_Data_c_wghtd <- ACS_Data_c %>% as_survey(ids = PERNUM, weight = PERWT)
-      } ## This will take a while.
-## Summarize & transform the ACS_Data
-    ACS_Data_avgage <- ACS_Data_c_wghtd %>% group_by(YEAR) %>% group_by(FIPStxt) %>% summarize(avgage = survey_mean()) 
-    ACS_Data_c_wghtd <- ACS_Data_c_wghtd %>% 
-    ACS_Data_White <- ACS_Data_c_wghtd %>% group_by(RACE) %>% summarize(proportion = survey_mean(),
-                      total = survey_total())
-
-
+    } ## This will take a while. Final set flat data frame should be 47,654,783 obs. of 33 variables 
+    ## Data formatting and variable additions
+    {ACS_Data_c$PERWT <- as.numeric(ACS_Data_c$PERWT) ## weighting needs this to numeric
+    ACS_Data_c$AGE <- as.numeric(ACS_Data_c$AGE) #for analysis later
+    ACS_Data_c$STATEFIP <- as.character(ACS_Data_c$STATEFIP) ## required for padding to correct format
+    ACS_Data_c$COUNTYFIPS <- as.character(ACS_Data_c$COUNTYFIPS) ## required for padding to correct format
+    ACS_Data_c$WDUM <- case_when(ACS_Data_c$RACE == "1" ~ 1,ACS_Data_c$RACE != "1" ~ 0) ## required for calculating weighted proportion of county that is White
+    ACS_Data_c$SDUM <- case_when(ACS_Data_c$SEX == "1" ~ 1, ACS_Data_c$SEX == "2" ~ 0) ## required for calculating weighted proportion of county that is male
+    ACS_Data_c$HDUM <- case_when(ACS_Data_c$HISPAN != "0" & ACS_Data_c$HISPAN != "9" ~ 1,
+                                 ACS_Data_c$HISPAN == "0" ~ 0,
+                                 ACS_Data_c$HISPAN == "9" ~ NA_real_)
+    ACS_Data_c$HISPAN <- NULL
+    ACS_Data_c$TRANTIME <- as.numeric(ACS_Data_c$TRANTIME)
+    ACS_Data_c$EMPSTAT <- as.factor(ACS_Data_c$EMPSTAT)
+    ACS_Data_c$VETSTAT <- as.factor(ACS_Data_c$VETSTAT)
+    require(stringr) ## needed for str_pad to work properly
+    ACS_Data_c$COUNTYFIPS <- str_pad(ACS_Data_c$COUNTYFIPS, 3, side = "left", pad = "0") ## correct format is "###"
+    ACS_Data_c$STATEFIP <- str_pad(ACS_Data_c$STATEFIP, 2, side = "left", pad = "0") ## correct format is "##"
+    ACS_Data_c <- ACS_Data_c %>% mutate(FIPStxt = paste(STATEFIP, COUNTYFIPS, sep = "")) ## finished format is "#####"
+    ACS_Data_c[,6:7] <- NULL
+    ACS_Data_c$YEAR <- as.factor(ACS_Data_c$YEAR)
+    ACS_Data_c$FIPStxt <- as.factor(ACS_Data_c$FIPStxt)
+    ACS_Data_c <- ACS_Data_c %>% group_by(FIPStxt, YEAR)
+    gc()
+    } 
+  ## ACS_Data summarization editing and variable adding
+    joinvar <- c("FIPStxt", "YEAR")
+    ACS_Sum <- ACS_Data_c %>% group_by(FIPStxt, YEAR) %>% summarise(WghtdPop = sum(PERWT))
+    ACS_Sum_WDUM <- ACS_Data_c %>% filter(WDUM == 1) %>% group_by(FIPStxt, YEAR) %>% summarise(WD_sum = sum(PERWT))
+    ACS_Sum <- left_join(ACS_Sum, ACS_Sum_WDUM, by = joinvar) ## Weighted Sum of Whites
+    ACS_Sum_SDUM <- ACS_Data_c %>% filter(SDUM == 1) %>% group_by(FIPStxt, YEAR) %>% summarise(SD_sum = sum(PERWT))
+    ACS_Sum <- left_join(ACS_Sum, ACS_Sum_SDUM, by = joinvar) ## Weighted Sum of Men
+    ACS_Sum_HDUM <- ACS_Data_c %>% filter(HDUM == 1) %>% group_by(FIPStxt, YEAR) %>% summarise(HD_sum = sum(PERWT))
+    ACS_Sum <- left_join(ACS_Sum, ACS_Sum_HDUM, by = joinvar) ## Weighted Sum of Hispanics
+    ACS_Sum_VDUM <- ACS_Data_c %>% filter(VETSTAT == "2") %>% group_by(FIPStxt, YEAR) %>% summarise(VS_sum = sum(PERWT))
+    ACS_Sum <- left_join(ACS_Sum, ACS_Sum_VDUM, by = joinvar) ## Weighted Sum Veterans
+    lbfval <- c("1","2")
+    ACS_Sum_LBFRDUM <- ACS_Data_c %>% filter(EMPSTAT == lbfval) %>% group_by(FIPStxt, YEAR) %>% summarise(LF_sum = sum(PERWT))
+    ACS_Sum <- left_join(ACS_Sum, ACS_Sum_LBFRDUM, by = joinvar) ## Weighted Sum of Individuals in Labor Force
+    ACS_Sum_AvgAge <- ACS_Data_c %>% group_by(FIPStxt, YEAR) %>% summarise(mean(AGE))
+    ACS_Sum <- left_join(ACS_Sum, ACS_Sum_AvgAge, by = joinvar) ## Unweighted Average Age
+    rm(ACS_Sum_SDUM, ACS_Sum_WDUM, ACS_Sum_HDUM, ACS_Sum_VDUM, ACS_Sum_LBFRDUM, ACS_Sum_AvgAge)
+    ACS_Sum <- ACS_Sum %>% mutate(W_PER = WD_sum/WghtdPop) ## Proportion of whites
+    ACS_Sum <- ACS_Sum %>% mutate(M_PER = SD_sum/WghtdPop) ## Proportion of Men
+    ACS_Sum <- ACS_Sum %>% mutate(H_PER = HD_sum/WghtdPop) ## Proportion identifying as Hispanic
+    ACS_Sum <- ACS_Sum %>% mutate(V_PER = VS_sum/WghtdPop) ## Proportion of Veterans
+    ACS_Sum <- ACS_Sum %>% mutate(LBF_PER = LF_sum/WghtdPop) ## Proportion in the Labor Force
+    colnames(ACS_Sum)[colnames(ACS_Sum) == 'mean(AGE)'] <- "AvgAge"
+    colnames(ACS_Sum)[colnames(ACS_Sum) == 'YEAR'] <- "Year"
+    rm(ACS_Data_c)
+  ## Join to jobsandrugs
+    joinvar <- c("FIPStxt", "Year")
+    jobsanddrugs <- left_join(jobsanddrugs, ACS_Sum, by = joinvar)
+  ## Clean up
+    rm(ACS_Sum, joinvar, lbfval)
+    
 ## Census American Community Survey Data Aggregate Table - GINI Index by County 2006-2016
 ## Downloaded from Census.Gov FactFinder Query tool
 ## Link: https://factfinder.census.gov/faces/nav/jsf/pages/searchresults.xhtml?refresh=t
@@ -395,7 +434,6 @@ factorToNumeric <- function(f) as.numeric(levels(f))[as.integer(f)]
       objectnames <- c("ACS.06","ACS.07","ACS.08","ACS.09","ACS.10",
                        "ACS.11","ACS.12","ACS.13","ACS.14","ACS.15","ACS.16")
       years <- c("2006", "2007", "2008", "2009", "2010", "2011", "2012", "2013", "2014", "2015", "2016")} ## Variables names for the GINI object creation 
-    
     ## Create the annual file dataframes, join the tables, create a new complete file
       if (!file.exists(zipname)){
         stop("Download ACS tables B19083 from Census.Gov at the county level")
@@ -502,8 +540,41 @@ factorToNumeric <- function(f) as.numeric(levels(f))[as.integer(f)]
       names(ACS.GINI)[names(ACS.GINI) == 'Id2'] <- 'FIPStxt'
       names(ACS.GINI)[names(ACS.GINI) == 'YEAR'] <- 'Year'
       ACS.GINI$FIPStxt <- as.character(ACS.GINI$FIPStxt)
-      jobsanddrugs <- left_join(jobsanddrugs,ACS.GINI,c("FIPStxt","Year"))}
+      jobsanddrugs <- left_join(jobsanddrugs,ACS.GINI,c("FIPStxt","Year"))
+      rm(ACS.GINI)
+      jobsanddrugs$Geography <- NULL
+      }
 
+## Census Region Attachment
+    {filename <- "US STATES REGIONS SUBREGIONS.xlsx"
+      fileURL <- "https://www.dropbox.com/s/ckd4nvqyzxf8sfy/censusregion.xlsx?dl=0"
+      objectname <- "censusregion"
+      ## Download the dataset:
+      if (!file.exists(filename)){
+        download.file(fileURL, filename, method="curl")
+      }
+      ## Load the data into R
+      if (!exists(objectname)){
+        CensusRegion <- read.xlsx2(file = filename,
+                                sheetIndex = 1, 
+                                startRow = 1,
+                                as.data.frame = TRUE,
+                                stringsasFactors = TRUE,
+                                header = TRUE)
+      }
+      dropvar <- c(1,5)
+      CensusRegion[,dropvar] <- NULL
+      colnames(CensusRegion)[colnames(CensusRegion) == 'State.Code'] <- "State"
+      jobsanddrugs <- left_join(jobsanddrugs, CensusRegion, by = "State")
+    }    
+  
 ## Saving the data to file
    setwd(workdir)
+   jndflnm <- "JobsAndDrugs.csv"
    write_csv(jobsanddrugs, path = jndflnm, na = "NA")
+   
+   ## Clean up
+   rm(CBSAtoFIPS, CensusRegion, FIPScodes, cols, dropvar, filename, 
+      fileURL, objectname, zipname, factorToNumeric, jobsanddrugs, jndflnm, workdir)
+   
+   
