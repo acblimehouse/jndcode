@@ -14,7 +14,10 @@
                     coeftest(fm, vcovCL)
     }
 ## Prepping the Environment
-    {filename <- "JobsAndDrugs.csv"
+    { 
+      library(tidyverse)
+      library(plm)
+      filename <- "JobsAndDrugs.csv"
       fileURL <- "https://www.dropbox.com/s/hqg08gxch4906p9/JobsAndDrugs.csv?dl=0"
       objectname <- "jobsanddrugs"
       ## Download the dataset:
@@ -23,12 +26,7 @@
       }
       ## Load the data into R
       if (!exists(objectname)){
-        FIPScodes <- read.xlsx2(file = filename,
-                                sheetIndex = 1, 
-                                startRow = 5,
-                                as.data.frame = TRUE,
-                                stringsasFactors = TRUE,
-                                header = TRUE)
+        jobsanddrugs <- as.data.frame(read.csv(file = filename, header = TRUE,colClasses = "character"))
       }
       ## Cleanup
       gc() ## to help improve performance of the code and decrease the chance of rJava erroring out.
